@@ -1,47 +1,69 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
+import FitnessPrograms from './components/FitnessPrograms.vue'
+import FitnessForm from './components/FitnessForm.vue'
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
+  <div class="app">
+    <header>
+      <h1>Men's Fitness Center</h1>
+      <p>Transform Your Body, Transform Your Life</p>
+    </header>
 
-    <div class="wrapper">
-      <HelloWorld msg="Jingbo Huang prepare for A1.2" />
-    </div>
-  </header>
-
-  <main>
-    <TheWelcome />
-  </main>
+    <main>
+      <!-- Dynamic data display component -->
+      <FitnessPrograms />
+      
+      <!-- Form component -->
+      <FitnessForm />
+    </main>
+  </div>
 </template>
 
 <style scoped>
+/* Responsive design */
+.app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
 header {
-  line-height: 1.5;
+  text-align: center;
+  margin-bottom: 30px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 30px;
+  border-radius: 10px;
+  color: white;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+header h1 {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: bold;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
+header p {
+  margin: 10px 0 0 0;
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
 
-  .logo {
-    margin: 0 2rem 0 0;
+/* Responsive design */
+@media (max-width: 600px) {
+  .app {
+    padding: 15px;
   }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
+  
+  header h1 {
+    font-size: 2rem;
+  }
+  
+  header p {
+    font-size: 1rem;
   }
 }
 </style>
