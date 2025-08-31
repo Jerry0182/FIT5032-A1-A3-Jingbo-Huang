@@ -120,36 +120,36 @@ const getApp = () => {
           <span>Or with email</span>
         </div>
 
-                 <!-- Email Input -->
-         <div class="input-group">
-           <input 
-             type="email" 
-             v-model="email"
-             placeholder="Email" 
-             class="form-input"
-             :class="{ 'error': emailError || (!emailValidation.isValid && email) }"
-           />
-           <div v-if="emailError || (!emailValidation.isValid && email)" class="error-message">
-             {{ emailError || emailValidation.message }}
-           </div>
-         </div>
+        <!-- Email Input -->
+        <div class="input-group">
+          <input 
+            type="email" 
+            v-model="email"
+            placeholder="Email" 
+            class="form-input"
+            :class="{ 'error': emailError || (!emailValidation.isValid && email) }"
+          />
+          <div v-if="emailError || (!emailValidation.isValid && email)" class="error-message">
+            {{ emailError || emailValidation.message }}
+          </div>
+        </div>
 
-         <!-- Password Input -->
-         <div class="input-group">
-           <input 
-             :type="showPassword ? 'text' : 'password'"
-             v-model="password"
-             placeholder="Create a password" 
-             class="form-input"
-             :class="{ 'error': passwordError || (!passwordValidation.isValid && password) }"
-           />
-           <button class="eye-btn" @click="togglePassword">
-             👁️
-           </button>
-           <div v-if="passwordError || (!passwordValidation.isValid && password)" class="error-message">
-             {{ passwordError || passwordValidation.message }}
-           </div>
-         </div>
+        <!-- Password Input -->
+        <div class="input-group">
+          <input 
+            :type="showPassword ? 'text' : 'password'"
+            v-model="password"
+            placeholder="Create a password" 
+            class="form-input"
+            :class="{ 'error': passwordError || (!passwordValidation.isValid && password) }"
+          />
+          <button class="eye-btn" @click="togglePassword">
+            👁️
+          </button>
+          <div v-if="passwordError || (!passwordValidation.isValid && password)" class="error-message">
+            {{ passwordError || passwordValidation.message }}
+          </div>
+        </div>
 
         <!-- Privacy Statement -->
         <div class="privacy-statement">
@@ -157,11 +157,11 @@ const getApp = () => {
           <a href="#" class="link">collection statement</a>.
         </div>
 
-                 <!-- Signup Button -->
-         <button class="signup-btn" @click="signupWithEmail">
-           It's Men time
-           <span class="arrow">→</span>
-         </button>
+        <!-- Signup Button -->
+        <button class="signup-btn" @click="signupWithEmail">
+          It's Men time
+          <span class="arrow">→</span>
+        </button>
 
         <!-- Get App Button -->
         <button class="get-app-btn" @click="getApp">
@@ -419,4 +419,60 @@ const getApp = () => {
   font-size: 16px;
 }
 
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+  .signup-page {
+    flex-direction: column;
+    margin-top: 66px;
+  }
+  
+  .left-section {
+    display: none; /* Hide background image on mobile */
+  }
+  
+  .right-section {
+    flex: none;
+    padding: 2rem 1rem;
+  }
+  
+  .form-container {
+    max-width: 100%;
+  }
+  
+  .form-header h2 {
+    font-size: 1.8rem;
+  }
+  
+  .google-btn,
+  .signup-btn,
+  .get-app-btn {
+    padding: 16px 20px;
+    font-size: 16px;
+  }
+  
+  .form-input {
+    padding: 14px 16px;
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .signup-page {
+    margin-top: 72px;
+  }
+  
+  .right-section {
+    padding: 2rem;
+  }
+  
+  .form-header h2 {
+    font-size: 2rem;
+  }
+}
+
+@media (min-width: 992px) {
+  .signup-page {
+    margin-top: 60px; /* Keep original desktop margin */
+  }
+}
 </style>
