@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import SignupPage from './components/SignupPage.vue'
+import LoginPage from './components/LoginPage.vue'
 
 // Configure your hero image here. Put your image under src/assets and update the file name if needed.
 const heroImage = new URL('./assets/home-hero.jpg', import.meta.url).href
@@ -100,6 +101,11 @@ onMounted(() => {
     <!-- Signup Page -->
     <div v-else-if="currentPage === 'signup'">
       <SignupPage />
+    </div>
+
+    <!-- Login Page -->
+    <div v-else-if="currentPage === 'login'">
+      <LoginPage />
     </div>
 
     <!-- Other pages placeholder -->
