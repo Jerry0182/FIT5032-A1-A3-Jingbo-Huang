@@ -48,7 +48,7 @@ export function registerUser(userData) {
     password: hashPassword(userData.password),
     name: userData.email.split('@')[0], // Use email prefix as username
     createdAt: new Date().toISOString(),
-    role: 'user' // Default role
+    role: userData.role || 'user' // Support role selection, default to 'user'
   }
   
   users.push(newUser)
@@ -103,4 +103,57 @@ export function initAuth() {
 // Check if user is logged in
 export function checkAuth() {
   return isLoggedIn.value && currentUser.value !== null
+}
+
+// Role management functions
+export const ROLES = {
+  USER: 'user',
+  ADMIN: 'admin'
+}
+
+// Admin registration password
+const ADMIN_REGISTRATION_PASSWORD = '123'
+
+// Check if current user has specific role
+export function hasRole(role) {
+  return currentUser.value && currentUser.value.role === role
+}
+
+// Check if current user is admin
+export function isAdmin() {
+  return hasRole(ROLES.ADMIN)
+}
+
+// Check if current user is regular user
+export function isUser() {
+  return hasRole(ROLES.USER)
+}
+
+// Get user role
+export function getUserRole() {
+  return currentUser.value ? currentUser.value.role : null
+}
+
+// Verify admin registration password
+export function verifyAdminPassword(password) {
+  return password === ADMIN_REGISTRATION_PASSWORD
+}
+
+// Update user role (admin only)
+export function updateUserRole(userId, newRole) {
+  if (!isAdmin()) {
+    return { success: false, message: 'Only admins can update user roles' }
+  }
+  
+  const users = getUsers()
+  const userIndex = users.findIndex(user => user.id === userId)
+  
+  if (userIndex === -1) {
+    return { success: false, message: 'User not found' }
+  }
+  
+  users[userIndex].role = newRole
+  saveUsers(users)
+  
+  return { success: true, message: 'User role updated successfully' }
 }

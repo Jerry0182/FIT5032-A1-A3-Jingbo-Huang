@@ -2,7 +2,12 @@
 import { ref, onMounted } from 'vue'
 import SignupPage from './components/SignupPage.vue'
 import LoginPage from './components/LoginPage.vue'
-import { currentUser, isLoggedIn, initAuth, logoutUser } from './utils/auth.js'
+import UserManagementPage from './components/UserManagementPage.vue'
+import SystemSettingsPage from './components/SystemSettingsPage.vue'
+import RatingModal from './components/RatingModal.vue'
+import { currentUser, isLoggedIn, initAuth, logoutUser, isAdmin } from './utils/auth.js'
+import { canAccessPage, isAdminPage } from './utils/roles.js'
+import { getAverageRating, getAllRatings, getUserRating } from './utils/ratings.js'
 
 // Configure your hero image here. Put your image under src/assets and update the file name if needed.
 const heroImage = new URL('./assets/home-hero.jpg', import.meta.url).href
@@ -10,14 +15,23 @@ const heroImage = new URL('./assets/home-hero.jpg', import.meta.url).href
 // Page routing
 const currentPage = ref('home')
 
-// Protected pages that require authentication
-const protectedPages = ['health-info', 'health-assessment', 'fitness', 'nutrition', 'community']
+// Rating modal
+const showRatingModal = ref(false)
+const userRating = ref(null)
+const totalRatings = ref(0)
 
+// Navigation with role-based access control
 const navigateTo = (page) => {
-  // Check if the page requires authentication
-  if (protectedPages.includes(page) && !isLoggedIn.value) {
-    alert('Please log in to access this page.')
-    currentPage.value = 'login'
+  // Check if user can access this page
+  if (!canAccessPage(page)) {
+    if (!isLoggedIn.value) {
+      alert('Please log in to access this page.')
+      currentPage.value = 'login'
+    } else if (isAdminPage(page)) {
+      alert('You need administrator privileges to access this page.')
+    } else {
+      alert('You do not have permission to access this page.')
+    }
     return
   }
   
@@ -28,6 +42,9 @@ const navigateTo = (page) => {
 onMounted(() => {
   // Initialize authentication state
   initAuth()
+  
+  // Initialize rating stats
+  updateRatingStats()
   
   const toggler = document.querySelector('.navbar-toggler')
   const navLinks = document.querySelector('.nav-links')
@@ -51,6 +68,27 @@ onMounted(() => {
 const handleLogout = () => {
   logoutUser()
   navigateTo('home')
+}
+
+// Rating functions
+const openRatingModal = () => {
+  if (!isLoggedIn.value) {
+    alert('Please log in first to rate our website')
+    navigateTo('login')
+    return
+  }
+  showRatingModal.value = true
+}
+
+const closeRatingModal = () => {
+  showRatingModal.value = false
+  // Refresh rating stats
+  updateRatingStats()
+}
+
+const updateRatingStats = () => {
+  userRating.value = getUserRating()
+  totalRatings.value = getAllRatings().length
 }
 </script>
 
@@ -77,6 +115,13 @@ const handleLogout = () => {
           <a href="#" class="nav-link" @click.prevent="navigateTo('nutrition')">Nutrition & Diet</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('community')">Community & Story</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('about')">About Us</a>
+          
+          <!-- Admin-only links -->
+          <template v-if="isAdmin()">
+            <div class="nav-separator"></div>
+            <a href="#" class="nav-link admin-link" @click.prevent="navigateTo('user-management')">User Management</a>
+            <a href="#" class="nav-link admin-link" @click.prevent="navigateTo('system-settings')">System Settings</a>
+          </template>
         </div>
         <div class="nav-controls">
           <button class="search-btn">🔍</button>
@@ -90,7 +135,10 @@ const handleLogout = () => {
           
           <!-- Logged in state -->
           <template v-else>
-            <span class="user-welcome">Welcome, {{ currentUser.name }}</span>
+            <span class="user-welcome">
+              Welcome, {{ currentUser.name }}
+              <span class="user-role" :class="currentUser.role">{{ currentUser.role.toUpperCase() }}</span>
+            </span>
             <button class="logout-btn" @click="handleLogout">Logout</button>
           </template>
         </div>
@@ -138,6 +186,108 @@ const handleLogout = () => {
       <LoginPage />
     </div>
 
+    <!-- User Management Page (Admin only) -->
+    <div v-else-if="currentPage === 'user-management'">
+      <UserManagementPage />
+    </div>
+
+    <!-- System Settings Page (Admin only) -->
+    <div v-else-if="currentPage === 'system-settings'">
+      <SystemSettingsPage />
+    </div>
+
+    <!-- About Us Page -->
+    <div v-else-if="currentPage === 'about'" class="about-page">
+      <div class="container">
+        <div class="row justify-content-center">
+          <div class="col-12 col-lg-10">
+            <!-- Header -->
+            <div class="page-header">
+              <h1 class="display-4 fw-bold text-white mb-3">About Us</h1>
+              <p class="lead text-white-50 mb-4">Learn more about our mission and values</p>
+            </div>
+
+            <!-- About Content -->
+            <div class="about-content">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="card">
+                    <div class="card-body">
+                      <h5 class="card-title">Our Mission</h5>
+                      <p class="card-text">
+                        We are dedicated to helping men achieve healthier lives through comprehensive 
+                        health information, fitness guidance, and nutritional advice. Our platform 
+                        provides evidence-based resources to support your wellness journey.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="card">
+                    <div class="card-body">
+                      <h5 class="card-title">Our Values</h5>
+                      <p class="card-text">
+                        We believe in accessibility, authenticity, and community. Every piece of 
+                        content is carefully curated to provide practical, actionable advice that 
+                        can make a real difference in your daily life.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Rating Section -->
+              <div class="rating-section">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h5 class="card-title">How are we doing?</h5>
+                    <p class="card-text">
+                      Your feedback helps us improve our platform and better serve our community.
+                    </p>
+                    
+                    <!-- User's Rating (for logged in users who have rated) -->
+                    <div v-if="isLoggedIn && userRating" class="rating-stats mb-3">
+                      <div class="user-rating">
+                        <span class="rating-number">{{ userRating.rating }}</span>
+                        <div class="stars-display">
+                          <span v-for="star in 5" :key="star" 
+                                :class="['star', { 'filled': star <= userRating.rating }]">
+                            ★
+                          </span>
+                        </div>
+                        <p class="rating-text">Your Rating</p>
+                      </div>
+                    </div>
+                    
+                    <button @click="openRatingModal" class="btn btn-primary btn-lg">
+                      {{ !isLoggedIn ? 'Login to Rate' : 
+                         userRating ? 'Update Your Rating' : 'Rate Our Website' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contact Info -->
+              <div class="contact-section">
+                <div class="card">
+                  <div class="card-body text-center">
+                    <h5 class="card-title">Get in Touch</h5>
+                    <p class="card-text">
+                      Have questions or suggestions? We'd love to hear from you.
+                    </p>
+                    <div class="contact-info">
+                      <p><strong>Email:</strong> contact@menhealth.com</p>
+                      <p><strong>Phone:</strong> +1 (555) 123-4567</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Other pages placeholder -->
     <div v-else class="page-placeholder">
       <div class="container">
@@ -152,6 +302,9 @@ const handleLogout = () => {
         </div>
       </div>
     </div>
+
+    <!-- Rating Modal -->
+    <RatingModal v-if="showRatingModal" @close="closeRatingModal" />
   </div>
 </template>
 
@@ -205,6 +358,22 @@ const handleLogout = () => {
   color: #667eea; 
 }
 
+.nav-separator {
+  width: 1px;
+  height: 20px;
+  background: #ddd;
+  margin: 0 15px;
+}
+
+.admin-link {
+  color: #d32f2f !important;
+  font-weight: 600;
+}
+
+.admin-link:hover {
+  color: #b71c1c !important;
+}
+
 .nav-controls { 
   display: flex; 
   align-items: center; 
@@ -255,6 +424,27 @@ const handleLogout = () => {
   font-weight: 700;
   font-size: 14px;
   margin-right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-role {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.user-role.user {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.user-role.admin {
+  background: #ffebee;
+  color: #d32f2f;
 }
 
 .logout-btn {
@@ -350,6 +540,87 @@ const handleLogout = () => {
 }
 
 .hero-text { margin-bottom: 28px; }
+
+/* About Us Page */
+.about-page {
+  margin-top: 60px;
+  padding: 2rem 0;
+  min-height: calc(100vh - 60px);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.about-content {
+  margin-top: 2rem;
+}
+
+.about-content .card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1.5rem;
+}
+
+.about-content .card-title {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.rating-section {
+  margin: 2rem 0;
+}
+
+.rating-stats {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.user-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rating-number {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #f39c12;
+}
+
+.stars-display {
+  display: flex;
+  gap: 2px;
+}
+
+.stars-display .star {
+  font-size: 1.2rem;
+  color: #ddd;
+}
+
+.stars-display .star.filled {
+  color: #f39c12;
+}
+
+.rating-text {
+  font-size: 0.9rem;
+  color: #7f8c8d;
+  margin: 0;
+}
+
+.contact-section {
+  margin-top: 2rem;
+}
+
+.contact-info p {
+  margin: 0.5rem 0;
+  color: #495057;
+}
 
 /* Page Placeholder */
 .page-placeholder {

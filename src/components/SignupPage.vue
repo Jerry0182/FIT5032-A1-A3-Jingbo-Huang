@@ -1,12 +1,17 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { registerUser, loginUser } from '../utils/auth.js'
+import { registerUser, loginUser, verifyAdminPassword } from '../utils/auth.js'
 
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const emailError = ref('')
 const passwordError = ref('')
+const selectedRole = ref('user')
+const adminPassword = ref('')
+const showAdminPassword = ref(false)
+const adminPasswordError = ref('')
+const showAdminForm = ref(false)
 
 // Email validation
 const validateEmail = (email) => {
@@ -50,6 +55,40 @@ const togglePassword = () => {
   showPassword.value = !showPassword.value
 }
 
+const toggleAdminPassword = () => {
+  showAdminPassword.value = !showAdminPassword.value
+}
+
+// Handle role selection
+const handleRoleChange = (role) => {
+  selectedRole.value = role
+  if (role === 'admin') {
+    showAdminForm.value = true
+    adminPasswordError.value = ''
+  } else {
+    showAdminForm.value = false
+    adminPassword.value = ''
+    adminPasswordError.value = ''
+  }
+}
+
+// Verify admin password
+const verifyAdmin = () => {
+  adminPasswordError.value = ''
+  
+  if (!adminPassword.value) {
+    adminPasswordError.value = 'Admin password is required'
+    return false
+  }
+  
+  if (!verifyAdminPassword(adminPassword.value)) {
+    adminPasswordError.value = 'Invalid admin password'
+    return false
+  }
+  
+  return true
+}
+
 const signupWithGoogle = () => {
   alert('Sign up with Google clicked')
 }
@@ -58,6 +97,7 @@ const signupWithEmail = () => {
   // Clear previous errors
   emailError.value = ''
   passwordError.value = ''
+  adminPasswordError.value = ''
   
   // Validate email
   if (!email.value) {
@@ -79,10 +119,18 @@ const signupWithEmail = () => {
     return
   }
   
+  // Validate admin password if admin role is selected
+  if (selectedRole.value === 'admin') {
+    if (!verifyAdmin()) {
+      return
+    }
+  }
+  
   // Attempt to register user
   const result = registerUser({
     email: email.value,
-    password: password.value
+    password: password.value,
+    role: selectedRole.value
   })
   
   if (result.success) {
@@ -135,6 +183,41 @@ const getApp = () => {
           <span>Or with email</span>
         </div>
 
+        <!-- Role Selection (Moved to top) -->
+        <div class="input-group">
+          <label class="role-label">Account Type</label>
+          <select v-model="selectedRole" @change="handleRoleChange(selectedRole)" class="form-select">
+            <option value="user">Regular User</option>
+            <option value="admin">Administrator</option>
+          </select>
+          <div class="role-description">
+            {{ selectedRole === 'user' ? 'Access to health features and community' : 'Full system access and user management' }}
+          </div>
+        </div>
+
+        <!-- Admin Password Input (Only shown for admin role) -->
+        <div v-if="showAdminForm" class="input-group admin-password-group">
+          <label class="role-label">Admin Registration Password</label>
+          <div class="admin-password-input">
+            <input 
+              :type="showAdminPassword ? 'text' : 'password'"
+              v-model="adminPassword"
+              placeholder="Enter admin password" 
+              class="form-input"
+              :class="{ 'error': adminPasswordError }"
+            />
+            <button class="eye-btn" @click="toggleAdminPassword">
+              👁️
+            </button>
+          </div>
+          <div v-if="adminPasswordError" class="error-message">
+            {{ adminPasswordError }}
+          </div>
+          <div class="admin-hint">
+            <small class="text-muted">Contact system administrator for the admin password</small>
+          </div>
+        </div>
+
         <!-- Email Input -->
         <div class="input-group">
           <input 
@@ -165,6 +248,7 @@ const getApp = () => {
             {{ passwordError || passwordValidation.message }}
           </div>
         </div>
+
 
         <!-- Privacy Statement -->
         <div class="privacy-statement">
@@ -360,6 +444,63 @@ const getApp = () => {
   cursor: pointer;
   font-size: 20px;
   padding: 6px;
+}
+
+/* Role Selection Styles */
+.role-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.form-select {
+  width: 100%;
+  padding: 16px 20px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  font-size: 18px;
+  background: white;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #333;
+}
+
+.role-description {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+  margin-left: 6px;
+  font-style: italic;
+}
+
+/* Admin Password Styles */
+.admin-password-group {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 1.5rem;
+}
+
+.admin-password-input {
+  position: relative;
+}
+
+.admin-hint {
+  margin-top: 8px;
+  text-align: center;
+}
+
+.admin-hint small {
+  font-size: 11px;
+  color: #856404;
+  font-style: italic;
 }
 
 /* Privacy Statement */
