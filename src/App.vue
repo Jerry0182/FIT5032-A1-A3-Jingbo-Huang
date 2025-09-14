@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import SignupPage from './components/SignupPage.vue'
 import LoginPage from './components/LoginPage.vue'
+import { currentUser, isLoggedIn, initAuth, logoutUser } from './utils/auth.js'
 
 // Configure your hero image here. Put your image under src/assets and update the file name if needed.
 const heroImage = new URL('./assets/home-hero.jpg', import.meta.url).href
@@ -9,12 +10,25 @@ const heroImage = new URL('./assets/home-hero.jpg', import.meta.url).href
 // Page routing
 const currentPage = ref('home')
 
+// Protected pages that require authentication
+const protectedPages = ['health-info', 'health-assessment', 'fitness', 'nutrition', 'community']
+
 const navigateTo = (page) => {
+  // Check if the page requires authentication
+  if (protectedPages.includes(page) && !isLoggedIn.value) {
+    alert('Please log in to access this page.')
+    currentPage.value = 'login'
+    return
+  }
+  
   currentPage.value = page
 }
 
-// Mobile menu toggle
+// Mobile menu toggle and auth initialization
 onMounted(() => {
+  // Initialize authentication state
+  initAuth()
+  
   const toggler = document.querySelector('.navbar-toggler')
   const navLinks = document.querySelector('.nav-links')
   
@@ -32,6 +46,12 @@ onMounted(() => {
     })
   }
 })
+
+// Logout function
+const handleLogout = () => {
+  logoutUser()
+  navigateTo('home')
+}
 </script>
 
 <template>
@@ -61,8 +81,18 @@ onMounted(() => {
         <div class="nav-controls">
           <button class="search-btn">🔍</button>
           <div class="separator"></div>
-          <a href="#" class="login-link" @click.prevent="navigateTo('login')">Log In</a>
-          <button class="signup-btn" @click="navigateTo('signup')">Sign up</button>
+          
+          <!-- Not logged in state -->
+          <template v-if="!isLoggedIn">
+            <a href="#" class="login-link" @click.prevent="navigateTo('login')">Log In</a>
+            <button class="signup-btn" @click="navigateTo('signup')">Sign up</button>
+          </template>
+          
+          <!-- Logged in state -->
+          <template v-else>
+            <span class="user-welcome">Welcome, {{ currentUser.name }}</span>
+            <button class="logout-btn" @click="handleLogout">Logout</button>
+          </template>
         </div>
       </div>
     </nav>
@@ -216,6 +246,30 @@ onMounted(() => {
 }
 
 .signup-btn:hover { 
+  background: #333; 
+  color: white; 
+}
+
+.user-welcome {
+  color: #333;
+  font-weight: 700;
+  font-size: 14px;
+  margin-right: 10px;
+}
+
+.logout-btn {
+  background: white; 
+  border: 1px solid #333; 
+  color: #333; 
+  padding: 8px 16px; 
+  border-radius: 4px; 
+  font-size: 14px; 
+  cursor: pointer; 
+  transition: all 0.3s ease; 
+  font-weight: 700; 
+}
+
+.logout-btn:hover { 
   background: #333; 
   color: white; 
 }

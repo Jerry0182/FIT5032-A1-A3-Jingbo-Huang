@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { loginUser } from '../utils/auth.js'
 
 const email = ref('')
 const password = ref('')
@@ -79,7 +80,16 @@ const loginWithEmail = () => {
     return
   }
   
-  alert('Login successful!')
+  // Attempt to login
+  const result = loginUser(email.value, password.value)
+  
+  if (result.success) {
+    alert('Login successful!')
+    // Refresh page to update navbar state
+    window.location.reload()
+  } else {
+    passwordError.value = result.message
+  }
 }
 
 const forgotPassword = () => {

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { registerUser, loginUser } from '../utils/auth.js'
 
 const email = ref('')
 const password = ref('')
@@ -78,7 +79,21 @@ const signupWithEmail = () => {
     return
   }
   
-  alert('Sign up successful!')
+  // Attempt to register user
+  const result = registerUser({
+    email: email.value,
+    password: password.value
+  })
+  
+  if (result.success) {
+    alert('Sign up successful! You are now logged in.')
+    // Auto login after successful registration
+    loginUser(email.value, password.value)
+    // Refresh page to update navbar state
+    window.location.reload()
+  } else {
+    emailError.value = result.message
+  }
 }
 
 const getApp = () => {
