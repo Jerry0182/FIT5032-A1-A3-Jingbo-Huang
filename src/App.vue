@@ -5,6 +5,10 @@ import LoginPage from './components/LoginPage.vue'
 import UserManagementPage from './components/UserManagementPage.vue'
 import SystemSettingsPage from './components/SystemSettingsPage.vue'
 import RatingModal from './components/RatingModal.vue'
+import HealthInfoPage from './components/HealthInfoPage.vue'
+import HealthAssessmentPage from './components/HealthAssessmentPage.vue'
+import FitnessPage from './components/FitnessPage.vue'
+import NutritionPage from './components/NutritionPage.vue'
 import { currentUser, isLoggedIn, initAuth, logoutUser, isAdmin } from './utils/auth.js'
 import { canAccessPage, isAdminPage } from './utils/roles.js'
 import { getAverageRating, getAllRatings, getUserRating } from './utils/ratings.js'
@@ -113,7 +117,6 @@ const updateRatingStats = () => {
           <a href="#" class="nav-link" @click.prevent="navigateTo('health-assessment')">Health Assessment</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('fitness')">Fitness & Exercise</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('nutrition')">Nutrition & Diet</a>
-          <a href="#" class="nav-link" @click.prevent="navigateTo('community')">Community & Story</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('about')">About Us</a>
           
           <!-- Admin-only links -->
@@ -164,7 +167,7 @@ const updateRatingStats = () => {
                       <span class="d-block">lives</span>
                     </h1>
                   </div>
-                  <button class="btn btn-dark btn-lg px-4 py-3 rounded-pill">
+                  <button class="btn btn-dark btn-lg px-4 py-3 rounded-pill" @click="navigateTo('health-assessment')">
                     Start analyzing your health
                     <span class="ms-2">→</span>
                   </button>
@@ -184,6 +187,26 @@ const updateRatingStats = () => {
     <!-- Login Page -->
     <div v-else-if="currentPage === 'login'">
       <LoginPage />
+    </div>
+
+    <!-- Health Info Page -->
+    <div v-else-if="currentPage === 'health-info'">
+      <HealthInfoPage />
+    </div>
+
+    <!-- Health Assessment Page -->
+    <div v-else-if="currentPage === 'health-assessment'">
+      <HealthAssessmentPage />
+    </div>
+
+    <!-- Fitness & Exercise Page -->
+    <div v-else-if="currentPage === 'fitness'">
+      <FitnessPage />
+    </div>
+
+    <!-- Nutrition & Diet Page -->
+    <div v-else-if="currentPage === 'nutrition'">
+      <NutritionPage />
     </div>
 
     <!-- User Management Page (Admin only) -->
@@ -355,7 +378,7 @@ const updateRatingStats = () => {
 }
 
 .nav-link:hover { 
-  color: #667eea; 
+  color: #2c3e50; 
 }
 
 .nav-separator {
@@ -546,7 +569,7 @@ const updateRatingStats = () => {
   margin-top: 60px;
   padding: 2rem 0;
   min-height: calc(100vh - 60px);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
 }
 
 .page-header {
@@ -629,7 +652,7 @@ const updateRatingStats = () => {
   min-height: calc(100vh - 60px);
   display: flex;
   align-items: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
 }
 
 /* Responsive adjustments */

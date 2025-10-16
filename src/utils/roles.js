@@ -8,7 +8,6 @@ export const PAGE_PERMISSIONS = {
   'health-assessment': [ROLES.USER, ROLES.ADMIN],
   'fitness': [ROLES.USER, ROLES.ADMIN],
   'nutrition': [ROLES.USER, ROLES.ADMIN],
-  'community': [ROLES.USER, ROLES.ADMIN],
   'about': [ROLES.USER, ROLES.ADMIN],
   'user-management': [ROLES.ADMIN], // Admin only
   'system-settings': [ROLES.ADMIN], // Admin only
