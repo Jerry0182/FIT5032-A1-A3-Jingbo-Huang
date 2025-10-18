@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { registerUser, loginUser, verifyAdminPassword } from '../utils/auth.js'
+import { registerUser, loginUser, verifyAdminPassword, loginWithGoogle } from '../utils/firebaseAuth.js'
 
 const email = ref('')
 const password = ref('')
@@ -89,11 +89,21 @@ const verifyAdmin = () => {
   return true
 }
 
-const signupWithGoogle = () => {
-  alert('Sign up with Google clicked')
+const handleGoogleSignup = async () => {
+  try {
+    const result = await loginWithGoogle()
+    if (result.success) {
+      alert('Google signup successful!')
+      window.location.reload()
+    } else {
+      alert(result.message)
+    }
+  } catch (error) {
+    alert('Google signup failed: ' + error.message)
+  }
 }
 
-const signupWithEmail = () => {
+const signupWithEmail = async () => {
   // Clear previous errors
   emailError.value = ''
   passwordError.value = ''
@@ -127,20 +137,22 @@ const signupWithEmail = () => {
   }
   
   // Attempt to register user
-  const result = registerUser({
-    email: email.value,
-    password: password.value,
-    role: selectedRole.value
-  })
-  
-  if (result.success) {
-    alert('Sign up successful! You are now logged in.')
-    // Auto login after successful registration
-    loginUser(email.value, password.value)
-    // Refresh page to update navbar state
-    window.location.reload()
-  } else {
-    emailError.value = result.message
+  try {
+    const result = await registerUser({
+      email: email.value,
+      password: password.value,
+      role: selectedRole.value
+    })
+    
+    if (result.success) {
+      alert('Sign up successful! You are now logged in.')
+      // Refresh page to update navbar state
+      window.location.reload()
+    } else {
+      emailError.value = result.message
+    }
+  } catch (error) {
+    emailError.value = 'Registration failed: ' + error.message
   }
 }
 
@@ -173,7 +185,7 @@ const getApp = () => {
         </div>
 
         <!-- Google Signup Button -->
-        <button class="google-btn" @click="signupWithGoogle">
+        <button class="google-btn" @click="handleGoogleSignup">
           <span class="google-icon">G</span>
           <span>Sign up with Google</span>
         </button>

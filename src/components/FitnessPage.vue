@@ -1,9 +1,33 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { 
+  getFitnessProgress, 
+  startWorkout, 
+  completeExercise, 
+  finishWorkout, 
+  calculateWorkoutProgress 
+} from '../utils/fitnessStorage.js'
 
 const selectedCategory = ref('all')
 const selectedWorkout = ref(null)
 const workoutProgress = ref({})
+
+// Fitness History Modal States
+const showHistoryModal = ref(false)
+const fitnessHistory = ref([])
+const fitnessStats = ref({
+  totalWorkouts: 0,
+  completedWorkouts: 0,
+  totalExercises: 0,
+  completedExercises: 0
+})
+
+// Interactive Table States
+const globalSearch = ref('')
+const sortField = ref('date')
+const sortDirection = ref('desc')
+const currentPage = ref(1)
+const itemsPerPage = 10
 
 const categories = [
   { id: 'all', name: 'All Workouts', icon: '💪' },
@@ -131,28 +155,21 @@ const filteredWorkouts = computed(() => {
   return workouts.filter(workout => workout.category === selectedCategory.value)
 })
 
-const startWorkout = (workout) => {
+const startWorkoutHandler = (workout) => {
   selectedWorkout.value = workout
-  workoutProgress.value[workout.id] = {
-    started: true,
-    currentExercise: 0,
-    startTime: new Date()
-  }
+  startWorkout(workout.id)
+  loadWorkoutProgress()
 }
 
-const completeExercise = (workoutId, exerciseIndex) => {
-  if (!workoutProgress.value[workoutId]) {
-    workoutProgress.value[workoutId] = { started: true, currentExercise: 0 }
-  }
-  workoutProgress.value[workoutId].currentExercise = exerciseIndex + 1
+const completeExerciseHandler = async (workoutId, exerciseIndex) => {
+  await completeExercise(workoutId, exerciseIndex)
+  loadWorkoutProgress()
 }
 
-const finishWorkout = (workoutId) => {
-  if (workoutProgress.value[workoutId]) {
-    workoutProgress.value[workoutId].completed = true
-    workoutProgress.value[workoutId].endTime = new Date()
-  }
+const finishWorkoutHandler = async (workoutId) => {
+  await finishWorkout(workoutId)
   selectedWorkout.value = null
+  loadWorkoutProgress()
 }
 
 const getDifficultyColor = (difficulty) => {
@@ -164,13 +181,218 @@ const getDifficultyColor = (difficulty) => {
   return colors[difficulty] || '#6c757d'
 }
 
-const getWorkoutProgress = (workoutId) => {
-  const progress = workoutProgress.value[workoutId]
-  if (!progress || !progress.started) return 0
-  
-  const totalExercises = workouts.find(w => w.id === workoutId)?.exercises.length || 1
-  return Math.round((progress.currentExercise / totalExercises) * 100)
+const loadWorkoutProgress = () => {
+  workoutProgress.value = getFitnessProgress()
 }
+
+const getWorkoutProgress = (workoutId) => {
+  const totalExercises = workouts.find(w => w.id === workoutId)?.exercises.length || 1
+  return calculateWorkoutProgress(workoutId, totalExercises)
+}
+
+const isExerciseCompleted = (workoutId, exerciseIndex) => {
+  const progress = workoutProgress.value[workoutId]
+  return progress && progress.completedExercises && progress.completedExercises.includes(exerciseIndex)
+}
+
+const getCompletedExerciseCount = (workoutId) => {
+  const progress = workoutProgress.value[workoutId]
+  return progress && progress.completedExercises ? progress.completedExercises.length : 0
+}
+
+const getButtonText = (workoutId) => {
+  const progress = getWorkoutProgress(workoutId)
+  const isStarted = workoutProgress.value[workoutId]?.started
+  
+  if (progress === 100) {
+    return 'Completed'
+  } else if (isStarted) {
+    return 'Continue'
+  } else {
+    return 'Start Workout'
+  }
+}
+
+// Fitness History Methods
+const loadFitnessHistory = () => {
+  const allProgress = getFitnessProgress()
+  const history = []
+  
+  Object.keys(allProgress).forEach(workoutId => {
+    const progress = allProgress[workoutId]
+    const workout = workouts.find(w => w.id == workoutId)
+    
+    if (workout && progress.started) {
+      history.push({
+        id: workoutId,
+        name: workout.title,
+        category: workout.category,
+        date: progress.startTime,
+        endDate: progress.endTime,
+        totalExercises: workout.exercises.length,
+        completedExercises: progress.completedExercises ? progress.completedExercises.length : 0,
+        progress: Math.round(((progress.completedExercises ? progress.completedExercises.length : 0) / workout.exercises.length) * 100),
+        status: progress.completed ? 'Completed' : 'In Progress',
+        duration: progress.startTime && progress.endTime ? 
+          Math.round((new Date(progress.endTime) - new Date(progress.startTime)) / (1000 * 60)) : null
+      })
+    }
+  })
+  
+  fitnessHistory.value = history.sort((a, b) => new Date(b.date) - new Date(a.date))
+  
+  // Calculate stats
+  fitnessStats.value = {
+    totalWorkouts: history.length,
+    completedWorkouts: history.filter(h => h.status === 'Completed').length,
+    totalExercises: history.reduce((sum, h) => sum + h.totalExercises, 0),
+    completedExercises: history.reduce((sum, h) => sum + h.completedExercises, 0)
+  }
+}
+
+const openHistoryModal = () => {
+  loadFitnessHistory()
+  showHistoryModal.value = true
+}
+
+const closeHistoryModal = () => {
+  showHistoryModal.value = false
+}
+
+// Interactive Table Methods
+const filteredHistory = computed(() => {
+  let filtered = [...fitnessHistory.value]
+
+  // Global search
+  if (globalSearch.value) {
+    const searchTerm = globalSearch.value.toLowerCase()
+    filtered = filtered.filter(workout =>
+      workout.name.toLowerCase().includes(searchTerm) ||
+      workout.category.toLowerCase().includes(searchTerm) ||
+      workout.status.toLowerCase().includes(searchTerm) ||
+      workout.progress.toString().includes(searchTerm) ||
+      formatDate(workout.date).toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Sort
+  if (sortField.value) {
+    filtered.sort((a, b) => {
+      let aVal = a[sortField.value]
+      let bVal = b[sortField.value]
+
+      if (sortField.value === 'date' || sortField.value === 'endDate') {
+        aVal = new Date(aVal)
+        bVal = new Date(bVal)
+      }
+
+      if (sortDirection.value === 'asc') {
+        return aVal > bVal ? 1 : -1
+      } else {
+        return aVal < bVal ? 1 : -1
+      }
+    })
+  }
+  return filtered
+})
+
+const totalPages = computed(() =>
+  Math.ceil(filteredHistory.value.length / itemsPerPage)
+)
+
+const paginatedHistory = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredHistory.value.slice(start, end)
+})
+
+const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage + 1)
+const endIndex = computed(() => Math.min(currentPage.value * itemsPerPage, filteredHistory.value.length))
+
+const visiblePages = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  const current = currentPage.value
+  
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  return pages
+})
+
+const sortBy = (field) => {
+  if (sortField.value === field) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDirection.value = 'asc'
+  }
+  currentPage.value = 1
+}
+
+const getSortIcon = (field) => {
+  if (sortField.value !== field) return '↕'
+  return sortDirection.value === 'asc' ? '↑' : '↓'
+}
+
+const handleGlobalSearch = () => {
+  currentPage.value = 1
+}
+
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'N/A'
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const getCategoryName = (categoryId) => {
+  const category = categories.find(c => c.id === categoryId)
+  return category ? category.name : categoryId
+}
+
+const getStatusBadgeClass = (status) => {
+  return status === 'Completed' ? 'bg-success' : 'bg-warning'
+}
+
+const getProgressClass = (progress) => {
+  if (progress >= 80) return 'text-success'
+  if (progress >= 50) return 'text-warning'
+  return 'text-danger'
+}
+
+// Load progress on component mount
+onMounted(() => {
+  loadWorkoutProgress()
+})
 </script>
 
 <template>
@@ -182,6 +404,9 @@ const getWorkoutProgress = (workoutId) => {
           <div class="page-header">
             <h1 class="display-4 fw-bold text-white mb-3">Fitness & Exercise</h1>
             <p class="lead text-white-50 mb-4">Transform your body with our comprehensive workout programs</p>
+            <button class="btn btn-primary btn-lg" @click="openHistoryModal">
+              📊 View Workout History
+            </button>
           </div>
 
           <!-- Category Filter -->
@@ -243,11 +468,10 @@ const getWorkoutProgress = (workoutId) => {
                   <div class="workout-footer">
                     <button 
                       class="start-btn"
-                      :disabled="workoutProgress[workout.id]?.completed"
-                      @click="startWorkout(workout)"
+                      :disabled="getWorkoutProgress(workout.id) === 100"
+                      @click="startWorkoutHandler(workout)"
                     >
-                      {{ workoutProgress[workout.id]?.completed ? 'Completed' : 
-                         workoutProgress[workout.id]?.started ? 'Continue' : 'Start Workout' }}
+                      {{ getButtonText(workout.id) }}
                     </button>
                   </div>
                 </div>
@@ -280,7 +504,7 @@ const getWorkoutProgress = (workoutId) => {
                         v-for="(exercise, index) in selectedWorkout.exercises" 
                         :key="index"
                         class="exercise-item"
-                        :class="{ completed: index < (workoutProgress[selectedWorkout.id]?.currentExercise || 0) }"
+                        :class="{ completed: isExerciseCompleted(selectedWorkout.id, index) }"
                       >
                         <div class="exercise-number">{{ index + 1 }}</div>
                         <div class="exercise-content">
@@ -293,10 +517,10 @@ const getWorkoutProgress = (workoutId) => {
                         <div class="exercise-actions">
                           <button 
                             class="complete-btn"
-                            :disabled="index >= (workoutProgress[selectedWorkout.id]?.currentExercise || 0)"
-                            @click="completeExercise(selectedWorkout.id, index)"
+                            :class="{ 'completed': isExerciseCompleted(selectedWorkout.id, index) }"
+                            @click="completeExerciseHandler(selectedWorkout.id, index)"
                           >
-                            {{ index < (workoutProgress[selectedWorkout.id]?.currentExercise || 0) ? '✓' : 'Complete' }}
+                            {{ isExerciseCompleted(selectedWorkout.id, index) ? '✓ Completed' : 'Complete' }}
                           </button>
                         </div>
                       </div>
@@ -338,7 +562,8 @@ const getWorkoutProgress = (workoutId) => {
                     <div class="sidebar-actions">
                       <button 
                         class="finish-btn"
-                        @click="finishWorkout(selectedWorkout.id)"
+                        :disabled="getCompletedExerciseCount(selectedWorkout.id) === 0"
+                        @click="finishWorkoutHandler(selectedWorkout.id)"
                       >
                         Finish Workout
                       </button>
@@ -370,6 +595,183 @@ const getWorkoutProgress = (workoutId) => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fitness History Modal -->
+    <div v-if="showHistoryModal" class="modal-overlay" @click="closeHistoryModal">
+      <div class="modal-content history-modal" @click.stop>
+        <div class="modal-header">
+          <h3>📊 Workout History</h3>
+          <button class="close-btn" @click="closeHistoryModal">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Statistics Cards -->
+          <div class="stats-section mb-4">
+            <div class="row">
+              <div class="col-md-3 mb-3">
+                <div class="stat-card">
+                  <div class="stat-icon">💪</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ fitnessStats.totalWorkouts }}</div>
+                    <div class="stat-label">Total Workouts</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3 mb-3">
+                <div class="stat-card">
+                  <div class="stat-icon">✅</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ fitnessStats.completedWorkouts }}</div>
+                    <div class="stat-label">Completed</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3 mb-3">
+                <div class="stat-card">
+                  <div class="stat-icon">🏃</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ fitnessStats.totalExercises }}</div>
+                    <div class="stat-label">Total Exercises</div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-3 mb-3">
+                <div class="stat-card">
+                  <div class="stat-icon">🎯</div>
+                  <div class="stat-content">
+                    <div class="stat-number">{{ fitnessStats.completedExercises }}</div>
+                    <div class="stat-label">Completed</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table Controls -->
+          <div class="table-controls mb-3">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <div class="global-search">
+                  <input 
+                    type="text" 
+                    v-model="globalSearch" 
+                    placeholder="Search by keywords (name, category, status, progress)..."
+                    class="form-control"
+                    @input="handleGlobalSearch"
+                  >
+                </div>
+              </div>
+              <div class="col-md-6 text-end">
+                <span class="results-info">
+                  Showing {{ startIndex }}-{{ endIndex }} of {{ filteredHistory.length }} workouts
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- History Table -->
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th @click="sortBy('date')" class="sortable table-header-cell">
+                    <span class="header-content">
+                      Date
+                      <span class="sort-icon">{{ getSortIcon('date') }}</span>
+                    </span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Workout</span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Category</span>
+                  </th>
+                  <th @click="sortBy('progress')" class="sortable table-header-cell">
+                    <span class="header-content">
+                      Progress
+                      <span class="sort-icon">{{ getSortIcon('progress') }}</span>
+                    </span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Status</span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Duration</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="workout in paginatedHistory" :key="workout.id">
+                  <td class="text-center">{{ formatDate(workout.date) }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-primary">{{ workout.name }}</span>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge bg-secondary">{{ getCategoryName(workout.category) }}</span>
+                  </td>
+                  <td class="text-center">
+                    <span class="progress-value" :class="getProgressClass(workout.progress)">
+                      {{ workout.progress }}%
+                    </span>
+                    <div class="progress-detail">
+                      {{ workout.completedExercises }}/{{ workout.totalExercises }} exercises
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge" :class="getStatusBadgeClass(workout.status)">
+                      {{ workout.status }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    {{ workout.duration ? workout.duration + ' min' : 'N/A' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="totalPages > 1" class="pagination-section">
+            <nav aria-label="Workout history pagination">
+              <ul class="pagination justify-content-center">
+                <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                  <button class="page-link" @click="goToPage(currentPage - 1)" :disabled="currentPage === 1">
+                    Previous
+                  </button>
+                </li>
+                <li 
+                  v-for="page in visiblePages" 
+                  :key="page"
+                  class="page-item"
+                  :class="{ active: page === currentPage }"
+                >
+                  <button 
+                    v-if="page !== '...'" 
+                    class="page-link" 
+                    @click="goToPage(page)"
+                  >
+                    {{ page }}
+                  </button>
+                  <span v-else class="page-link disabled">...</span>
+                </li>
+                <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                  <button class="page-link" @click="goToPage(currentPage + 1)" :disabled="currentPage === totalPages">
+                    Next
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
+
+          <!-- Empty State -->
+          <div v-if="filteredHistory.length === 0" class="empty-state text-center py-5">
+            <div class="empty-icon">🏃‍♂️</div>
+            <h5>No workout history found</h5>
+            <p class="text-muted">Start your first workout to see your progress here!</p>
           </div>
         </div>
       </div>
@@ -703,6 +1105,16 @@ const getWorkoutProgress = (workoutId) => {
   cursor: not-allowed;
 }
 
+.complete-btn.completed {
+  background: #28a745;
+  color: white;
+  cursor: default;
+}
+
+.complete-btn.completed:hover {
+  background: #28a745;
+}
+
 .workout-sidebar {
   background: #f8f9fa;
   border-radius: 8px;
@@ -769,8 +1181,13 @@ const getWorkoutProgress = (workoutId) => {
   transition: background-color 0.3s ease;
 }
 
-.finish-btn:hover {
+.finish-btn:hover:not(:disabled) {
   background: #218838;
+}
+
+.finish-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
 }
 
 .fitness-tips {
@@ -853,6 +1270,284 @@ const getWorkoutProgress = (workoutId) => {
   
   .tips-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Fitness History Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1050;
+}
+
+.history-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 1200px;
+  width: 95%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #dee2e6;
+  background: #f8f9fa;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+/* Statistics Cards */
+.stats-section .row {
+  margin: 0 -0.75rem;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-icon {
+  font-size: 2rem;
+  opacity: 0.8;
+}
+
+.stat-content {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+/* Table Controls */
+.table-controls {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.global-search input {
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+
+.global-search input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+  outline: none;
+}
+
+.results-info {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Table Styling */
+.table {
+  margin-bottom: 0;
+}
+
+.table th {
+  background: #f8f9fa;
+  border-top: none;
+  font-weight: 600;
+  color: #495057;
+}
+
+.table td {
+  vertical-align: middle;
+  border-top: 1px solid #dee2e6;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(102, 126, 234, 0.05);
+}
+
+/* Table Header Styling */
+.table-header-cell {
+  padding: 12px 16px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  position: relative;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.sortable:hover {
+  background-color: #495057;
+  color: white;
+}
+
+.sort-icon {
+  opacity: 0.7;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.sortable:hover .sort-icon {
+  opacity: 1;
+}
+
+/* Table Column Widths */
+.table th:nth-child(1) { width: 20%; } /* Date */
+.table th:nth-child(2) { width: 25%; } /* Workout */
+.table th:nth-child(3) { width: 15%; } /* Category */
+.table th:nth-child(4) { width: 20%; } /* Progress */
+.table th:nth-child(5) { width: 15%; } /* Status */
+.table th:nth-child(6) { width: 10%; } /* Duration */
+
+/* Progress Value Styling */
+.progress-value {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.progress-detail {
+  font-size: 0.8rem;
+  color: #6c757d;
+  margin-top: 0.25rem;
+}
+
+/* Pagination */
+.pagination-section {
+  margin-top: 2rem;
+}
+
+.pagination .page-link {
+  color: #667eea;
+  border: 1px solid #dee2e6;
+  padding: 0.5rem 0.75rem;
+}
+
+.pagination .page-item.active .page-link {
+  background-color: #667eea;
+  border-color: #667eea;
+}
+
+.pagination .page-link:hover {
+  color: #5a6fd8;
+  background-color: #e9ecef;
+  border-color: #dee2e6;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 3rem 2rem;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-state h5 {
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive adjustments for modal */
+@media (max-width: 767.98px) {
+  .history-modal {
+    width: 98%;
+    margin: 1rem;
+  }
+  
+  .modal-header,
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .stats-section .row {
+    margin: 0;
+  }
+  
+  .stat-card {
+    margin-bottom: 1rem;
+  }
+  
+  .table-responsive {
+    font-size: 0.85rem;
+  }
+  
+  .table-header-cell {
+    padding: 8px 12px;
   }
 }
 </style>

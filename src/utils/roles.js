@@ -1,5 +1,5 @@
 // Role-based access control utilities
-import { ROLES, hasRole, isAdmin, isUser, getUserRole } from './auth.js'
+import { ROLES, hasRole, isAdmin, isUser, getUserRole } from './firebaseAuth.js'
 
 // Define page permissions for different roles
 export const PAGE_PERMISSIONS = {

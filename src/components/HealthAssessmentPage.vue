@@ -1,7 +1,18 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { saveAssessment, getAssessments, getAssessmentStats } from '../utils/assessmentStorage.js'
 
 const currentStep = ref(0)
+const showHistory = ref(false)
+const assessmentHistory = ref([])
+const assessmentStats = ref({})
+
+// Interactive table states
+const globalSearch = ref('')
+const sortField = ref('date')
+const sortDirection = ref('desc')
+const currentPage = ref(1)
+const itemsPerPage = 10
 const assessmentData = ref({
   personalInfo: {
     age: '',
@@ -104,9 +115,23 @@ const toggleArrayItem = (array, item) => {
 const submitAssessment = () => {
   // Calculate health score and recommendations
   const score = calculateHealthScore()
-  assessmentData.value.score = score
-  assessmentData.value.recommendations = generateRecommendations(score)
-  nextStep()
+  const recommendations = generateRecommendations(score)
+  
+  // Save assessment to localStorage
+  const savedAssessment = saveAssessment({
+    type: 'Comprehensive Health Assessment',
+    score: score,
+    recommendations: recommendations
+  })
+  
+  if (savedAssessment) {
+    assessmentData.value.score = score
+    assessmentData.value.recommendations = recommendations
+    assessmentData.value.saved = true
+    nextStep()
+  } else {
+    alert('Failed to save assessment. Please try again.')
+  }
 }
 
 const calculateHealthScore = () => {
@@ -178,6 +203,149 @@ const resetAssessment = () => {
     healthHistory: { chronicConditions: [], medications: '', familyHistory: [] },
     lifestyle: { exerciseFrequency: '', dietQuality: '', sleepHours: '', stressLevel: '' },
     goals: { primaryGoal: '', timeframe: '', specificTargets: [] }
+  }
+}
+
+// Load assessment history
+const loadHistory = () => {
+  assessmentHistory.value = getAssessments()
+  assessmentStats.value = getAssessmentStats()
+}
+
+// View history
+const viewHistory = () => {
+  loadHistory()
+  showHistory.value = true
+}
+
+// Close history
+const closeHistory = () => {
+  showHistory.value = false
+}
+
+// Initialize data on mount
+onMounted(() => {
+  loadHistory()
+})
+
+// Format date for display
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  })
+}
+
+// Get score class for styling
+const getScoreClass = (score) => {
+  if (score >= 90) return 'text-success'
+  if (score >= 80) return 'text-primary'
+  if (score >= 70) return 'text-warning'
+  return 'text-danger'
+}
+
+// Get status badge class
+const getStatusBadgeClass = (status) => {
+  const classes = {
+    'Excellent': 'bg-success',
+    'Good': 'bg-primary',
+    'Fair': 'bg-warning',
+    'Needs Improvement': 'bg-danger'
+  }
+  return classes[status] || 'bg-secondary'
+}
+
+// Interactive table computed properties
+const filteredHistory = computed(() => {
+  let filtered = [...assessmentHistory.value]
+
+  // Global search - search by keywords
+  if (globalSearch.value) {
+    const searchTerm = globalSearch.value.toLowerCase()
+    filtered = filtered.filter(assessment => 
+      assessment.type.toLowerCase().includes(searchTerm) ||
+      assessment.status.toLowerCase().includes(searchTerm) ||
+      assessment.recommendations.some(rec => 
+        rec.toLowerCase().includes(searchTerm)
+      ) ||
+      assessment.score.toString().includes(searchTerm) ||
+      formatDate(assessment.date).toLowerCase().includes(searchTerm)
+    )
+  }
+
+  // Sort
+  if (sortField.value) {
+    filtered.sort((a, b) => {
+      let aVal = a[sortField.value]
+      let bVal = b[sortField.value]
+
+      if (sortField.value === 'date') {
+        aVal = new Date(aVal)
+        bVal = new Date(bVal)
+      }
+
+      if (sortDirection.value === 'asc') {
+        return aVal > bVal ? 1 : -1
+      } else {
+        return aVal < bVal ? 1 : -1
+      }
+    })
+  }
+
+  return filtered
+})
+
+const totalPages = computed(() => 
+  Math.ceil(filteredHistory.value.length / itemsPerPage)
+)
+
+const paginatedHistory = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage
+  const end = start + itemsPerPage
+  return filteredHistory.value.slice(start, end)
+})
+
+const startIndex = computed(() => (currentPage.value - 1) * itemsPerPage)
+const endIndex = computed(() => 
+  Math.min(startIndex.value + itemsPerPage, filteredHistory.value.length)
+)
+
+const visiblePages = computed(() => {
+  const pages = []
+  const start = Math.max(1, currentPage.value - 2)
+  const end = Math.min(totalPages.value, currentPage.value + 2)
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  return pages
+})
+
+// Interactive table methods
+const sortBy = (field) => {
+  if (sortField.value === field) {
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDirection.value = 'asc'
+  }
+  currentPage.value = 1
+}
+
+const getSortIcon = (field) => {
+  if (sortField.value !== field) return '↕'
+  return sortDirection.value === 'asc' ? '↑' : '↓'
+}
+
+const handleGlobalSearch = () => {
+  currentPage.value = 1
+}
+
+
+const goToPage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
   }
 }
 </script>
@@ -439,6 +607,9 @@ const resetAssessment = () => {
                     <button class="btn btn-primary btn-lg" @click="resetAssessment">
                       Take Assessment Again
                     </button>
+                    <button class="btn btn-outline-primary btn-lg ms-3" @click="viewHistory">
+                      📊 View Assessment History
+                    </button>
                   </div>
                 </div>
 
@@ -471,6 +642,157 @@ const resetAssessment = () => {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assessment History Modal -->
+    <div v-if="showHistory" class="modal-overlay" @click="closeHistory">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Assessment History</h3>
+          <button class="btn-close" @click="closeHistory">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Statistics -->
+          <div class="stats-section mb-4">
+            <div class="row">
+              <div class="col-md-3">
+                <div class="stat-card">
+                  <h4>{{ assessmentStats.total }}</h4>
+                  <p>Total Assessments</p>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card">
+                  <h4>{{ assessmentStats.averageScore }}</h4>
+                  <p>Average Score</p>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card">
+                  <h4>{{ assessmentStats.recentTrend }}</h4>
+                  <p>Recent Trend</p>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <div class="stat-card">
+                  <h4>{{ Object.keys(assessmentStats.byType).length }}</h4>
+                  <p>Assessment Types</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Table Controls -->
+          <div class="table-controls mb-3">
+            <div class="row">
+              <div class="col-md-12">
+                <div class="search-box">
+                  <input 
+                    type="text" 
+                    v-model="globalSearch" 
+                    placeholder="Search by keywords (type, status, recommendations)..."
+                    class="form-control"
+                    @input="handleGlobalSearch"
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive History Table -->
+          <div class="table-responsive">
+            <table class="table table-striped">
+              <thead class="table-dark">
+                <tr>
+                  <th @click="sortBy('date')" class="sortable table-header-cell">
+                    <span class="header-content">
+                      Date
+                      <span class="sort-icon">{{ getSortIcon('date') }}</span>
+                    </span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Type</span>
+                  </th>
+                  <th @click="sortBy('score')" class="sortable table-header-cell">
+                    <span class="header-content">
+                      Score
+                      <span class="sort-icon">{{ getSortIcon('score') }}</span>
+                    </span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Status</span>
+                  </th>
+                  <th class="table-header-cell">
+                    <span class="header-content">Recommendations</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="assessment in paginatedHistory" :key="assessment.id">
+                  <td class="text-center">{{ formatDate(assessment.date) }}</td>
+                  <td class="text-center">
+                    <span class="badge bg-primary">{{ assessment.type }}</span>
+                  </td>
+                  <td class="text-center">
+                    <span class="score-value" :class="getScoreClass(assessment.score)">
+                      {{ assessment.score }}/100
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <span class="badge" :class="getStatusBadgeClass(assessment.status)">
+                      {{ assessment.status }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    <div class="recommendations">
+                      {{ assessment.recommendations.slice(0, 2).join(', ') }}
+                      <span v-if="assessment.recommendations.length > 2">
+                        +{{ assessment.recommendations.length - 2 }} more
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-section">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <div class="pagination-info">
+                  Showing {{ startIndex + 1 }} to {{ endIndex }} of {{ filteredHistory.length }} assessments
+                </div>
+              </div>
+              <div class="col-md-6">
+                <nav aria-label="Assessment pagination">
+                  <ul class="pagination justify-content-end">
+                    <li class="page-item" :class="{ disabled: currentPage === 1 }">
+                      <button class="page-link" @click="goToPage(currentPage - 1)">Previous</button>
+                    </li>
+                    <li 
+                      v-for="page in visiblePages" 
+                      :key="page" 
+                      class="page-item" 
+                      :class="{ active: page === currentPage }"
+                    >
+                      <button class="page-link" @click="goToPage(page)">{{ page }}</button>
+                    </li>
+                    <li class="page-item" :class="{ disabled: currentPage === totalPages }">
+                      <button class="page-link" @click="goToPage(currentPage + 1)">Next</button>
+                    </li>
+                  </ul>
+                </nav>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeHistory">Close</button>
         </div>
       </div>
     </div>
@@ -763,6 +1085,249 @@ const resetAssessment = () => {
   
   .score-number {
     font-size: 2.5rem;
+  }
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6c757d;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e9ecef;
+}
+
+/* Stats Section */
+.stats-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.stat-card {
+  text-align: center;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.stat-card p {
+  margin: 0.5rem 0 0 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+/* Table Styles */
+.table th {
+  border-top: none;
+  font-weight: 600;
+}
+
+.score-value {
+  font-weight: bold;
+}
+
+.recommendations {
+  max-width: 200px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 767.98px) {
+  .modal-content {
+    width: 95%;
+    margin: 10px;
+  }
+  
+  .modal-header, .modal-body, .modal-footer {
+    padding: 1rem;
+  }
+  
+  .stats-section .row {
+    margin: 0;
+  }
+  
+  .stat-card {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Interactive Table Styles */
+.table-controls {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.search-box input, .column-search input, .column-search select {
+  border-radius: 8px;
+  border: 2px solid #e9ecef;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.search-box input:focus, .column-search input:focus, .column-search select:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+}
+
+/* Table Header Styling */
+.table-header-cell {
+  padding: 12px 16px;
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  position: relative;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease;
+}
+
+.sortable:hover {
+  background-color: #495057;
+}
+
+.sort-icon {
+  opacity: 0.7;
+  font-size: 14px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.sortable:hover .sort-icon {
+  opacity: 1;
+}
+
+/* Table Column Widths */
+.table th:nth-child(1) { width: 15%; } /* Date */
+.table th:nth-child(2) { width: 25%; } /* Type */
+.table th:nth-child(3) { width: 15%; } /* Score */
+.table th:nth-child(4) { width: 20%; } /* Status */
+.table th:nth-child(5) { width: 25%; } /* Recommendations */
+
+.pagination-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e9ecef;
+}
+
+.pagination-info {
+  color: #6c757d;
+  font-size: 0.9rem;
+}
+
+.page-link {
+  border-radius: 6px;
+  margin: 0 2px;
+  border: 1px solid #dee2e6;
+  color: #007bff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.page-link:hover {
+  background-color: #e9ecef;
+  border-color: #adb5bd;
+}
+
+.page-item.active .page-link {
+  background-color: #007bff;
+  border-color: #007bff;
+}
+
+.page-item.disabled .page-link {
+  color: #6c757d;
+  background-color: #fff;
+  border-color: #dee2e6;
+}
+
+@media (max-width: 767.98px) {
+  .table-controls .row {
+    margin: 0;
+  }
+  
+  .table-controls .col-md-6 {
+    margin-bottom: 1rem;
+  }
+  
+  .pagination-section .row {
+    margin: 0;
+  }
+  
+  .pagination {
+    justify-content: center !important;
+  }
+  
+  .pagination-info {
+    text-align: center;
+    margin-bottom: 1rem;
   }
 }
 </style>

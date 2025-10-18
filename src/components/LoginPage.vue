@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { loginUser } from '../utils/auth.js'
+import { loginUser, loginWithGoogle } from '../utils/firebaseAuth.js'
 
 const email = ref('')
 const password = ref('')
@@ -51,11 +51,21 @@ const togglePassword = () => {
   showPassword.value = !showPassword.value
 }
 
-const loginWithGoogle = () => {
-  alert('Login with Google clicked')
+const handleGoogleLogin = async () => {
+  try {
+    const result = await loginWithGoogle()
+    if (result.success) {
+      alert('Google login successful!')
+      window.location.reload()
+    } else {
+      alert(result.message)
+    }
+  } catch (error) {
+    alert('Google login failed: ' + error.message)
+  }
 }
 
-const loginWithEmail = () => {
+const loginWithEmail = async () => {
   // Clear previous errors
   emailError.value = ''
   passwordError.value = ''
@@ -81,14 +91,18 @@ const loginWithEmail = () => {
   }
   
   // Attempt to login
-  const result = loginUser(email.value, password.value)
-  
-  if (result.success) {
-    alert('Login successful!')
-    // Refresh page to update navbar state
-    window.location.reload()
-  } else {
-    passwordError.value = result.message
+  try {
+    const result = await loginUser(email.value, password.value)
+    
+    if (result.success) {
+      alert('Login successful!')
+      // Refresh page to update navbar state
+      window.location.reload()
+    } else {
+      passwordError.value = result.message
+    }
+  } catch (error) {
+    passwordError.value = 'Login failed: ' + error.message
   }
 }
 
@@ -123,7 +137,7 @@ const getApp = () => {
         </div>
 
         <!-- Google Login Button -->
-        <button class="google-btn" @click="loginWithGoogle">
+        <button class="google-btn" @click="handleGoogleLogin">
           <span class="google-icon">G</span>
           <span>Log in with Google</span>
         </button>

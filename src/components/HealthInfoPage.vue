@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import EmailSender from './EmailSender.vue'
 
 const healthTopics = ref([
   {
@@ -215,6 +216,7 @@ const healthTopics = ref([
 ])
 
 const selectedTopic = ref(null)
+const showEmailModal = ref(false)
 
 const selectTopic = (topic) => {
   selectedTopic.value = topic
@@ -222,6 +224,14 @@ const selectTopic = (topic) => {
 
 const backToTopics = () => {
   selectedTopic.value = null
+}
+
+const openEmailModal = () => {
+  showEmailModal.value = true
+}
+
+const closeEmailModal = () => {
+  showEmailModal.value = false
 }
 </script>
 
@@ -234,6 +244,9 @@ const backToTopics = () => {
           <div class="page-header">
             <h1 class="display-4 fw-bold text-white mb-3">Health Information</h1>
             <p class="lead text-white-50 mb-4">Comprehensive health resources and educational content</p>
+            <button class="btn btn-primary btn-lg" @click="openEmailModal">
+              📧 Share Health Articles
+            </button>
           </div>
 
           <!-- Health Topics Grid -->
@@ -322,6 +335,12 @@ const backToTopics = () => {
         </div>
       </div>
     </div>
+    
+    <!-- Email Sender Modal -->
+    <EmailSender 
+      :show-modal="showEmailModal" 
+      @close="closeEmailModal"
+    />
   </div>
 </template>
 

@@ -9,7 +9,7 @@ import HealthInfoPage from './components/HealthInfoPage.vue'
 import HealthAssessmentPage from './components/HealthAssessmentPage.vue'
 import FitnessPage from './components/FitnessPage.vue'
 import NutritionPage from './components/NutritionPage.vue'
-import { currentUser, isLoggedIn, initAuth, logoutUser, isAdmin } from './utils/auth.js'
+import { currentUser, isLoggedIn, initAuth, logoutUser, isAdmin } from './utils/firebaseAuth.js'
 import { canAccessPage, isAdminPage } from './utils/roles.js'
 import { getAverageRating, getAllRatings, getUserRating } from './utils/ratings.js'
 
@@ -198,6 +198,7 @@ const updateRatingStats = () => {
     <div v-else-if="currentPage === 'health-assessment'">
       <HealthAssessmentPage />
     </div>
+
 
     <!-- Fitness & Exercise Page -->
     <div v-else-if="currentPage === 'fitness'">

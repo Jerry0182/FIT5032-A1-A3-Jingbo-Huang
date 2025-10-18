@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { getUsers, updateUserRole, ROLES } from '../utils/auth.js'
+import { getUsers, updateUserRole, ROLES } from '../utils/firebaseAuth.js'
 import { getRoleDisplayName, getRoleDescription } from '../utils/roles.js'
 
 const users = ref([])
