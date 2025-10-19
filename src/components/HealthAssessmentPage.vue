@@ -1,11 +1,18 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { saveAssessment, getAssessments, getAssessmentStats } from '../utils/assessmentStorage.js'
+import { calculateHealthScoreCloud, getHealthHistoryCloud, saveAssessmentCloud } from '../utils/healthAssessmentCloud.js'
 
 const currentStep = ref(0)
 const showHistory = ref(false)
 const assessmentHistory = ref([])
-const assessmentStats = ref({})
+const assessmentStats = ref({
+  totalAssessments: 0,
+  averageScore: 0,
+  lastAssessment: null,
+  byType: {},
+  recentTrend: 'No data'
+})
 
 // Interactive table states
 const globalSearch = ref('')
@@ -112,25 +119,30 @@ const toggleArrayItem = (array, item) => {
   }
 }
 
-const submitAssessment = () => {
-  // Calculate health score and recommendations
-  const score = calculateHealthScore()
-  const recommendations = generateRecommendations(score)
-  
-  // Save assessment to localStorage
-  const savedAssessment = saveAssessment({
-    type: 'Comprehensive Health Assessment',
-    score: score,
-    recommendations: recommendations
-  })
-  
-  if (savedAssessment) {
-    assessmentData.value.score = score
-    assessmentData.value.recommendations = recommendations
-    assessmentData.value.saved = true
-    nextStep()
-  } else {
-    alert('Failed to save assessment. Please try again.')
+const submitAssessment = async () => {
+  try {
+    // Use Cloud Function with local fallback
+    const result = await calculateHealthScoreCloud(assessmentData.value)
+    
+    if (result && result.score !== undefined) {
+      assessmentData.value.score = result.score
+      assessmentData.value.recommendations = result.recommendations || []
+      assessmentData.value.saved = true
+      
+      // Save assessment locally as backup
+      saveAssessment({
+        type: 'Comprehensive Health Assessment',
+        score: result.score,
+        recommendations: result.recommendations
+      })
+      
+      nextStep()
+    } else {
+      throw new Error('Invalid response from health assessment')
+    }
+  } catch (error) {
+    console.error('Assessment submission failed:', error)
+    alert('Failed to submit assessment. Please try again.')
   }
 }
 
@@ -186,7 +198,7 @@ const generateRecommendations = (score) => {
   } else if (score < 70) {
     recommendations.push('Good foundation, focus on specific improvements')
     recommendations.push('Consider adding more physical activity')
-    recommendations.push('Review your nutrition habits')
+    recommendations.push('Consider improving your diet habits')
   } else {
     recommendations.push('Excellent health habits!')
     recommendations.push('Continue maintaining your current lifestyle')
@@ -197,6 +209,7 @@ const generateRecommendations = (score) => {
 }
 
 const resetAssessment = () => {
+  console.log('resetAssessment called')
   currentStep.value = 0
   assessmentData.value = {
     personalInfo: { age: '', height: '', weight: '', activityLevel: '' },
@@ -204,18 +217,52 @@ const resetAssessment = () => {
     lifestyle: { exerciseFrequency: '', dietQuality: '', sleepHours: '', stressLevel: '' },
     goals: { primaryGoal: '', timeframe: '', specificTargets: [] }
   }
+  console.log('resetAssessment completed, currentStep:', currentStep.value)
 }
 
 // Load assessment history
-const loadHistory = () => {
-  assessmentHistory.value = getAssessments()
-  assessmentStats.value = getAssessmentStats()
+const loadHistory = async () => {
+  try {
+    // Try Cloud Function first, fallback to local
+    const result = await getHealthHistoryCloud()
+    
+    if (result && result.assessments) {
+      assessmentHistory.value = result.assessments
+      
+      // Calculate stats from cloud data
+      if (result.assessments.length > 0) {
+        const totalScore = result.assessments.reduce((sum, assessment) => sum + assessment.score, 0)
+        assessmentStats.value = {
+          totalAssessments: result.assessments.length,
+          averageScore: Math.round(totalScore / result.assessments.length),
+          lastAssessment: result.assessments[0]
+        }
+      } else {
+        assessmentStats.value = { totalAssessments: 0, averageScore: 0, lastAssessment: null }
+      }
+    } else {
+      throw new Error('No assessments from cloud')
+    }
+  } catch (error) {
+    console.warn('Failed to load from cloud, using local storage:', error)
+    // Fallback to local storage
+    assessmentHistory.value = getAssessments()
+    assessmentStats.value = getAssessmentStats()
+  }
 }
 
 // View history
-const viewHistory = () => {
-  loadHistory()
-  showHistory.value = true
+const viewHistory = async () => {
+  console.log('viewHistory called')
+  try {
+    await loadHistory()
+    console.log('loadHistory completed')
+    showHistory.value = true
+    console.log('showHistory set to true:', showHistory.value)
+  } catch (error) {
+    console.error('Error in viewHistory:', error)
+    showHistory.value = true
+  }
 }
 
 // Close history
@@ -660,7 +707,7 @@ const goToPage = (page) => {
             <div class="row">
               <div class="col-md-3">
                 <div class="stat-card">
-                  <h4>{{ assessmentStats.total }}</h4>
+                  <h4>{{ assessmentStats.totalAssessments }}</h4>
                   <p>Total Assessments</p>
                 </div>
               </div>
@@ -678,7 +725,7 @@ const goToPage = (page) => {
               </div>
               <div class="col-md-3">
                 <div class="stat-card">
-                  <h4>{{ Object.keys(assessmentStats.byType).length }}</h4>
+                  <h4>{{ assessmentStats.byType ? Object.keys(assessmentStats.byType).length : 0 }}</h4>
                   <p>Assessment Types</p>
                 </div>
               </div>

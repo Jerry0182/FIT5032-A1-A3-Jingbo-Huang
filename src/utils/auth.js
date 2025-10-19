@@ -134,6 +134,11 @@ export function getUserRole() {
   return currentUser.value ? currentUser.value.role : null
 }
 
+// Get current user
+export function getCurrentUser() {
+  return currentUser.value
+}
+
 // Verify admin registration password
 export function verifyAdminPassword(password) {
   return password === ADMIN_REGISTRATION_PASSWORD

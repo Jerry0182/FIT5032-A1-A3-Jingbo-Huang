@@ -1,4 +1,5 @@
 import emailjs from '@emailjs/browser'
+import { callCloudFunction, isCloudAvailable } from './cloudService.js'
 
 // EmailJS configuration
 const EMAILJS_SERVICE_ID = 'service_eb1d0iv'
@@ -15,12 +16,6 @@ const healthArticles = [
     title: "The Importance of Regular Exercise",
     content: "Regular exercise is crucial for maintaining good health. It helps improve cardiovascular health, strengthens muscles, and boosts mental well-being. Aim for at least 150 minutes of moderate-intensity exercise per week.",
     category: "Fitness"
-  },
-  {
-    id: 2,
-    title: "Nutrition Tips for Men's Health",
-    content: "A balanced diet rich in fruits, vegetables, lean proteins, and whole grains is essential for men's health. Stay hydrated, limit processed foods, and consider supplements if needed.",
-    category: "Nutrition"
   },
   {
     id: 3,
@@ -75,31 +70,43 @@ export function generateArticlePDF(article) {
   return pdfContent
 }
 
-// Send email with health article
+// Local email sending function (fallback)
+const sendEmailLocally = async (data) => {
+  const { recipientEmail, senderName, articleContent } = data
+  
+  const templateParams = {
+    to_email: recipientEmail,
+    from_name: senderName,
+    article_title: articleContent.title,
+    article_content: articleContent.content,
+    article_category: articleContent.category,
+    article_id: articleContent.id
+  }
+  
+  const result = await emailjs.send(
+    EMAILJS_SERVICE_ID,
+    EMAILJS_TEMPLATE_ID,
+    templateParams
+  )
+  
+  return { success: true, message: 'Health article sent successfully!' }
+}
+
+// Send email with health article (with Cloud Function support)
 export async function sendHealthArticleEmail(recipientEmail, senderName = 'Anonymous') {
   try {
     // Get random article
     const article = getRandomHealthArticle()
     
-    // Email template parameters
-    const templateParams = {
-      to_email: recipientEmail,
-      from_name: senderName,
-      article_title: article.title,
-      article_content: article.content,
-      article_category: article.category,
-      article_id: article.id
-    }
-    
-    // Send email
-    const result = await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      templateParams
+    // Try Cloud Function first, fallback to local
+    const result = await callCloudFunction(
+      'sendHealthEmail',
+      { recipientEmail, senderName, articleContent: article },
+      sendEmailLocally
     )
     
     console.log('Email sent successfully:', result)
-    return { success: true, message: 'Health article sent successfully!' }
+    return result
     
   } catch (error) {
     console.error('Email sending failed:', error)

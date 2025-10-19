@@ -69,9 +69,14 @@ const submitRating = async () => {
       setTimeout(() => {
         emit('close')
       }, 2000)
+    } else {
+      // Handle error case
+      console.error('Rating submission failed:', result.message)
+      alert(result.message || 'Failed to submit rating. Please try again.')
     }
   } catch (error) {
     console.error('Error submitting rating:', error)
+    alert('An error occurred while submitting your rating. Please try again.')
   } finally {
     isSubmitting.value = false
   }

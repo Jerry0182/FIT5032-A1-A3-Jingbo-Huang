@@ -1,6 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import EmailSender from './EmailSender.vue'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
+
+// Export functionality
+const isExporting = ref(false)
 
 const healthTopics = ref([
   {
@@ -109,41 +114,6 @@ const healthTopics = ref([
     ]
   },
   {
-    id: 4,
-    title: 'Nutrition & Diet',
-    description: 'Healthy eating habits and nutritional guidelines.',
-    icon: '🥗',
-    articles: [
-      {
-        id: 1,
-        title: 'Macronutrients Demystified: Protein, Carbs, and Fats',
-        author: 'Dr. Maria Gonzalez',
-        date: 'December 13, 2024',
-        readTime: '8 min read',
-        summary: 'Understanding the role of macronutrients in men\'s health and how to optimize your intake for peak performance.',
-        content: 'Understanding macronutrients is fundamental to optimizing your nutrition for health, performance, and body composition. Each macronutrient plays a unique role in supporting men\'s health and fitness goals.\n\nProtein is crucial for muscle repair, immune function, and hormone production. Men typically need 1.2-2.0 grams of protein per kilogram of body weight, depending on activity level and goals. High-quality protein sources include lean meats, fish, eggs, dairy, and plant-based options like beans and quinoa.\n\nCarbohydrates are the body\'s primary energy source, particularly important for brain function and physical performance. Focus on complex carbohydrates from whole grains, fruits, and vegetables, which provide sustained energy and essential nutrients.\n\nDietary fats are essential for hormone production, nutrient absorption, and cellular function. Healthy fats from sources like avocados, nuts, seeds, and olive oil support testosterone production and overall health.\n\nThe key is finding the right balance for your individual needs and goals. Active men may need more carbohydrates for fuel, while those focused on body composition may benefit from higher protein intake.\n\nMeal timing can also impact nutrient utilization. Consuming protein and carbohydrates around workouts can enhance recovery and performance, while spreading protein intake throughout the day supports muscle protein synthesis.'
-      },
-      {
-        id: 2,
-        title: 'Meal Prep Made Simple: A Busy Man\'s Guide',
-        author: 'Dr. Thomas Wilson',
-        date: 'December 6, 2024',
-        readTime: '6 min read',
-        summary: 'Practical meal preparation strategies for busy men who want to maintain healthy eating habits.',
-        content: 'Meal preparation is one of the most effective strategies for maintaining healthy eating habits, especially for busy men who struggle to find time for cooking during the week. With proper planning and preparation, you can ensure nutritious meals are always available.\n\nStart by planning your meals for the week, considering your schedule, preferences, and nutritional goals. Choose recipes that can be prepared in bulk and store well in the refrigerator or freezer.\n\nBatch cooking on weekends can save significant time during the week. Prepare large quantities of proteins like chicken, fish, or beans, along with grains and vegetables that can be mixed and matched throughout the week.\n\nInvest in quality storage containers that are microwave-safe and airtight. Glass containers are ideal for reheating and don\'t absorb odors or flavors from previous meals.\n\nPre-cut vegetables and portion out snacks to make healthy choices convenient. Having washed and cut vegetables ready in the refrigerator makes it easy to add them to meals or enjoy as snacks.\n\nDon\'t forget about breakfast and snacks. Preparing overnight oats, hard-boiled eggs, or protein smoothie ingredients in advance ensures you start each day with nutritious fuel.\n\nRemember that meal prep doesn\'t have to be perfect. Even preparing a few meals or ingredients in advance can make a significant difference in your eating habits and overall health.'
-      },
-      {
-        id: 3,
-        title: 'Supplements: What Men Really Need to Know',
-        author: 'Dr. Rachel Kim',
-        date: 'December 4, 2024',
-        readTime: '7 min read',
-        summary: 'Evidence-based guide to supplements that can benefit men\'s health and those that are unnecessary.',
-        content: 'The supplement industry is vast and often confusing, with many products promising miraculous results. Understanding which supplements are actually beneficial for men\'s health can help you make informed decisions and avoid wasting money on unnecessary products.\n\nMost men can meet their nutritional needs through a balanced diet, but certain supplements may be beneficial depending on individual circumstances. Vitamin D is often recommended, especially for men who spend little time outdoors or live in areas with limited sunlight.\n\nOmega-3 fatty acids from fish oil supplements may benefit heart health, particularly for men who don\'t regularly consume fatty fish. However, getting these nutrients from food sources is generally preferred.\n\nProtein supplements can be convenient for men who struggle to meet their protein needs through food alone, but they\'re not necessary if you\'re already consuming adequate protein from whole foods.\n\nMultivitamins may be beneficial for men with restrictive diets or certain health conditions, but they shouldn\'t replace a healthy diet. Focus on getting nutrients from food first.\n\nBefore starting any supplement regimen, consult with a healthcare provider. Some supplements can interact with medications or cause side effects, and testing can help identify specific deficiencies that need addressing.\n\nRemember that supplements are meant to supplement, not replace, a healthy diet and lifestyle. Focus on building a solid foundation of good nutrition and exercise habits first.'
-      }
-    ]
-  },
-  {
     id: 5,
     title: 'Preventive Care',
     description: 'Regular health screenings and preventive measures.',
@@ -233,6 +203,129 @@ const openEmailModal = () => {
 const closeEmailModal = () => {
   showEmailModal.value = false
 }
+
+// Export function
+const exportAllArticlesToPDF = async () => {
+  isExporting.value = true
+  
+  try {
+    // Get all articles from all topics
+    const allArticles = []
+    healthTopics.value.forEach(topic => {
+      topic.articles.forEach(article => {
+        allArticles.push(article)
+      })
+    })
+    
+    // Create a temporary div with the content
+    const tempDiv = document.createElement('div')
+    tempDiv.style.position = 'absolute'
+    tempDiv.style.left = '-9999px'
+    tempDiv.style.top = '-9999px'
+    tempDiv.style.width = '800px'
+    tempDiv.style.padding = '20px'
+    tempDiv.style.backgroundColor = 'white'
+    tempDiv.style.fontFamily = 'Arial, sans-serif'
+    tempDiv.style.fontSize = '14px'
+    tempDiv.style.lineHeight = '1.6'
+    
+    // Generate HTML content
+    const htmlContent = generatePDFContent(allArticles)
+    tempDiv.innerHTML = htmlContent
+    
+    // Add to DOM temporarily
+    document.body.appendChild(tempDiv)
+    
+    // Convert to canvas
+    const canvas = await html2canvas(tempDiv, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    })
+    
+    // Remove temp div
+    document.body.removeChild(tempDiv)
+    
+    // Create PDF
+    const imgData = canvas.toDataURL('image/png')
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    
+    const imgWidth = 210 // A4 width in mm
+    const pageHeight = 295 // A4 height in mm
+    const imgHeight = (canvas.height * imgWidth) / canvas.width
+    let heightLeft = imgHeight
+    
+    let position = 0
+    
+    // Add first page
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pageHeight
+    
+    // Add additional pages if needed
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+    }
+    
+    // Download PDF
+    const fileName = `health-articles-${new Date().toISOString().split('T')[0]}.pdf`
+    pdf.save(fileName)
+    
+    alert(`Successfully exported all ${allArticles.length} articles to PDF!`)
+    
+  } catch (error) {
+    console.error('Export failed:', error)
+    alert('Failed to export articles. Please try again.')
+  } finally {
+    isExporting.value = false
+  }
+}
+
+const generatePDFContent = (articles) => {
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  })
+  
+  return `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="text-align: center; margin-bottom: 40px; border-bottom: 2px solid #3498db; padding-bottom: 20px;">
+        <h1 style="color: #2c3e50; margin: 0 0 10px 0; font-size: 28px;">Men's Health Platform</h1>
+        <h2 style="color: #7f8c8d; margin: 0 0 10px 0; font-size: 20px; font-weight: normal;">Health Articles Export</h2>
+        <p style="color: #95a5a6; margin: 0; font-size: 14px;">Generated on ${currentDate}</p>
+      </div>
+      
+      ${articles.map((article, index) => `
+        <div style="margin-bottom: 40px; page-break-inside: avoid;">
+          <h3 style="color: #2c3e50; font-size: 20px; margin: 0 0 10px 0; border-left: 4px solid #3498db; padding-left: 15px;">
+            ${index + 1}. ${article.title}
+          </h3>
+          <div style="color: #7f8c8d; font-size: 12px; margin-bottom: 15px; background: #f8f9fa; padding: 8px 12px; border-radius: 4px;">
+            <strong>Author:</strong> ${article.author} | 
+            <strong>Date:</strong> ${article.date} | 
+            <strong>Read Time:</strong> ${article.readTime}
+          </div>
+          <div style="color: #34495e; font-style: italic; margin-bottom: 15px; padding: 10px; background: #ecf0f1; border-radius: 4px;">
+            <strong>Summary:</strong> ${article.summary}
+          </div>
+          <div style="color: #2c3e50; line-height: 1.8;">
+            ${article.content.replace(/\n\n/g, '</p><p style="margin: 15px 0;">').replace(/\n/g, '<br>')}
+          </div>
+        </div>
+      `).join('')}
+      
+      <div style="margin-top: 50px; text-align: center; border-top: 2px solid #ecf0f1; padding-top: 20px;">
+        <p style="color: #7f8c8d; font-size: 12px; margin: 0;">
+          Exported from Men's Health Platform - ${articles.length} article(s) | ${currentDate}
+        </p>
+      </div>
+    </div>
+  `
+}
 </script>
 
 <template>
@@ -244,9 +337,19 @@ const closeEmailModal = () => {
           <div class="page-header">
             <h1 class="display-4 fw-bold text-white mb-3">Health Information</h1>
             <p class="lead text-white-50 mb-4">Comprehensive health resources and educational content</p>
-            <button class="btn btn-primary btn-lg" @click="openEmailModal">
-              📧 Share Health Articles
-            </button>
+            <div class="d-flex gap-3">
+              <button class="btn btn-primary btn-lg" @click="openEmailModal">
+                📧 Share Health Articles
+              </button>
+              <button 
+                class="btn btn-success btn-lg" 
+                :disabled="isExporting"
+                @click="exportAllArticlesToPDF"
+              >
+                <span v-if="isExporting" class="spinner-border spinner-border-sm me-2"></span>
+                {{ isExporting ? 'Exporting...' : '📄 Export All Articles' }}
+              </button>
+            </div>
           </div>
 
           <!-- Health Topics Grid -->
@@ -341,6 +444,7 @@ const closeEmailModal = () => {
       :show-modal="showEmailModal" 
       @close="closeEmailModal"
     />
+
   </div>
 </template>
 
@@ -614,4 +718,5 @@ const closeEmailModal = () => {
     margin-bottom: 0.5rem;
   }
 }
+
 </style>

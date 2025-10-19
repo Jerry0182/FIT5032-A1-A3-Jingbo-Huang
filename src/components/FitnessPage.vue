@@ -12,6 +12,10 @@ const selectedCategory = ref('all')
 const selectedWorkout = ref(null)
 const workoutProgress = ref({})
 
+// Map-related states
+const showGymMap = ref(false)
+const melbourneGyms = ref([])
+
 // Fitness History Modal States
 const showHistoryModal = ref(false)
 const fitnessHistory = ref([])
@@ -259,6 +263,76 @@ const closeHistoryModal = () => {
   showHistoryModal.value = false
 }
 
+// Melbourne CBD Gyms Data
+const melbourneCBDGyms = [
+  {
+    id: 'gym_1',
+    name: 'Fitness First Collins Street',
+    address: 'Level 3, 333 Collins Street, Melbourne VIC 3000',
+    rating: 4.2,
+    openNow: true,
+    lat: -37.8175,
+    lng: 144.9671,
+    description: 'Premium gym with state-of-the-art equipment and group classes'
+  },
+  {
+    id: 'gym_2', 
+    name: 'Anytime Fitness Bourke Street',
+    address: '240 Bourke Street, Melbourne VIC 3000',
+    rating: 4.0,
+    openNow: true,
+    lat: -37.8136,
+    lng: 144.9631,
+    description: '24/7 access gym with personal training services'
+  },
+  {
+    id: 'gym_3',
+    name: 'Virgin Active Melbourne Central',
+    address: 'Melbourne Central, Level 4, 211 La Trobe Street, Melbourne VIC 3000',
+    rating: 4.5,
+    openNow: true,
+    lat: -37.8103,
+    lng: 144.9631,
+    description: 'Luxury fitness club with swimming pool and spa facilities'
+  },
+  {
+    id: 'gym_4',
+    name: 'Goodlife Health Clubs Queen Street',
+    address: 'Level 1, 123 Queen Street, Melbourne VIC 3000',
+    rating: 4.1,
+    openNow: true,
+    lat: -37.8179,
+    lng: 144.9631,
+    description: 'Full-service gym with group fitness classes and personal training'
+  },
+  {
+    id: 'gym_5',
+    name: 'Jetts Fitness Flinders Street',
+    address: 'Ground Floor, 1 Flinders Street, Melbourne VIC 3000',
+    rating: 3.9,
+    openNow: true,
+    lat: -37.8183,
+    lng: 144.9671,
+    description: 'Affordable 24/7 gym with modern equipment and friendly staff'
+  }
+]
+
+// Map-related functions
+const openGymMap = () => {
+  showGymMap.value = true
+  melbourneGyms.value = melbourneCBDGyms
+}
+
+const closeGymMap = () => {
+  showGymMap.value = false
+  melbourneGyms.value = []
+}
+
+const goToGym = (gym) => {
+  const url = `https://www.google.com/maps/dir/?api=1&destination=${gym.lat},${gym.lng}`
+  window.open(url, '_blank')
+}
+
 // Interactive Table Methods
 const filteredHistory = computed(() => {
   let filtered = [...fitnessHistory.value]
@@ -404,9 +478,14 @@ onMounted(() => {
           <div class="page-header">
             <h1 class="display-4 fw-bold text-white mb-3">Fitness & Exercise</h1>
             <p class="lead text-white-50 mb-4">Transform your body with our comprehensive workout programs</p>
-            <button class="btn btn-primary btn-lg" @click="openHistoryModal">
-              📊 View Workout History
-            </button>
+            <div class="d-flex gap-3">
+              <button class="btn btn-primary btn-lg" @click="openHistoryModal">
+                📊 View Workout History
+              </button>
+              <button class="btn btn-success btn-lg" @click="openGymMap">
+                🏋️ Explore Gyms
+              </button>
+            </div>
           </div>
 
           <!-- Category Filter -->
@@ -773,6 +852,54 @@ onMounted(() => {
             <h5>No workout history found</h5>
             <p class="text-muted">Start your first workout to see your progress here!</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gym Map Modal -->
+    <div v-if="showGymMap" class="modal-overlay" @click="closeGymMap">
+      <div class="modal-content gym-map-modal" @click.stop>
+        <div class="modal-header">
+          <h3>🏋️ Melbourne CBD Gyms</h3>
+          <button class="close-btn" @click="closeGymMap">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="mb-4">
+            <p class="text-muted mb-3">Discover top-rated gyms and fitness centers in Melbourne's Central Business District</p>
+          </div>
+
+          <!-- Gym Results -->
+          <div class="row">
+            <div v-for="gym in melbourneGyms" :key="gym.id" class="col-lg-6 mb-4">
+              <div class="gym-card">
+                <div class="gym-info">
+                  <h5 class="gym-name">{{ gym.name }}</h5>
+                  <p class="gym-address text-muted mb-2">
+                    {{ gym.address }}
+                  </p>
+                  <p class="gym-description small mb-3">{{ gym.description }}</p>
+                  <div class="gym-rating mb-3">
+                    <span class="rating-text fw-bold">{{ gym.rating.toFixed(1) }} ⭐</span>
+                  </div>
+                  <div class="gym-status">
+                    <span v-if="gym.openNow" class="badge bg-success">
+                      Open Now
+                    </span>
+                    <span v-else class="badge bg-secondary">
+                      Closed
+                    </span>
+                  </div>
+                </div>
+                <div class="gym-actions">
+                  <button class="btn btn-primary" @click="goToGym(gym)">
+                    Go There
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
@@ -1471,6 +1598,80 @@ onMounted(() => {
 .table th:nth-child(4) { width: 20%; } /* Progress */
 .table th:nth-child(5) { width: 15%; } /* Status */
 .table th:nth-child(6) { width: 10%; } /* Duration */
+
+/* Gym Map Modal Styles */
+.gym-map-modal {
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.gym-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.gym-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.gym-info {
+  flex: 1;
+  margin-bottom: 1rem;
+}
+
+.gym-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+  font-size: 1.1rem;
+}
+
+.gym-address {
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.gym-description {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.gym-rating {
+  display: flex;
+  align-items: center;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.rating-text {
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+.gym-status {
+  margin-top: 0.5rem;
+}
+
+.gym-actions {
+  margin-top: auto;
+}
+
+.gym-actions .btn {
+  width: 100%;
+}
+
 
 /* Progress Value Styling */
 .progress-value {

@@ -1,5 +1,5 @@
 // Rating management utilities
-import { currentUser } from './auth.js'
+import { currentUser } from './firebaseAuth.js'
 
 // Rating data storage key
 const RATINGS_KEY = 'health_app_ratings'
@@ -17,6 +17,11 @@ export function saveRatings(ratings) {
 
 // Add a new rating
 export function addRating(ratingData) {
+  // Check if user is logged in
+  if (!currentUser.value) {
+    return { success: false, message: 'User not logged in' }
+  }
+  
   const ratings = getAllRatings()
   
   // Check if user has already rated

@@ -1,10 +1,18 @@
 // Assessment data storage utilities
-const STORAGE_KEY = 'health_assessments'
+import { getCurrentUser } from './auth.js'
+
+// Get user-specific storage key
+function getUserStorageKey() {
+  const user = getCurrentUser()
+  const userId = user ? user.id : 'anonymous'
+  return `health_assessments_${userId}`
+}
 
 // Get all assessments from localStorage
 export function getAssessments() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const storageKey = getUserStorageKey()
+    const stored = localStorage.getItem(storageKey)
     return stored ? JSON.parse(stored) : []
   } catch (error) {
     console.error('Error loading assessments from localStorage:', error)
@@ -36,8 +44,9 @@ export function saveAssessment(assessmentData) {
       assessments.splice(50)
     }
     
-    // Save to localStorage
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(assessments))
+    // Save to localStorage with user-specific key
+    const storageKey = getUserStorageKey()
+    localStorage.setItem(storageKey, JSON.stringify(assessments))
     
     return newAssessment
   } catch (error) {
@@ -111,7 +120,8 @@ export function getAssessmentStats() {
 
 // Clear all assessments (for testing)
 export function clearAllAssessments() {
-  localStorage.removeItem(STORAGE_KEY)
+  const storageKey = getUserStorageKey()
+  localStorage.removeItem(storageKey)
 }
 
 // Delete specific assessment
@@ -119,7 +129,8 @@ export function deleteAssessment(assessmentId) {
   try {
     const assessments = getAssessments()
     const filtered = assessments.filter(a => a.id !== assessmentId)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered))
+    const storageKey = getUserStorageKey()
+    localStorage.setItem(storageKey, JSON.stringify(filtered))
     return true
   } catch (error) {
     console.error('Error deleting assessment:', error)

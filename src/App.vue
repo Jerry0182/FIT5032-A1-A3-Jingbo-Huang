@@ -8,7 +8,6 @@ import RatingModal from './components/RatingModal.vue'
 import HealthInfoPage from './components/HealthInfoPage.vue'
 import HealthAssessmentPage from './components/HealthAssessmentPage.vue'
 import FitnessPage from './components/FitnessPage.vue'
-import NutritionPage from './components/NutritionPage.vue'
 import { currentUser, isLoggedIn, initAuth, logoutUser, isAdmin } from './utils/firebaseAuth.js'
 import { canAccessPage, isAdminPage } from './utils/roles.js'
 import { getAverageRating, getAllRatings, getUserRating } from './utils/ratings.js'
@@ -116,7 +115,6 @@ const updateRatingStats = () => {
           <a href="#" class="nav-link" @click.prevent="navigateTo('health-info')">Health Info</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('health-assessment')">Health Assessment</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('fitness')">Fitness & Exercise</a>
-          <a href="#" class="nav-link" @click.prevent="navigateTo('nutrition')">Nutrition & Diet</a>
           <a href="#" class="nav-link" @click.prevent="navigateTo('about')">About Us</a>
           
           <!-- Admin-only links -->
@@ -127,8 +125,6 @@ const updateRatingStats = () => {
           </template>
         </div>
         <div class="nav-controls">
-          <button class="search-btn">🔍</button>
-          <div class="separator"></div>
           
           <!-- Not logged in state -->
           <template v-if="!isLoggedIn">
@@ -205,10 +201,6 @@ const updateRatingStats = () => {
       <FitnessPage />
     </div>
 
-    <!-- Nutrition & Diet Page -->
-    <div v-else-if="currentPage === 'nutrition'">
-      <NutritionPage />
-    </div>
 
     <!-- User Management Page (Admin only) -->
     <div v-else-if="currentPage === 'user-management'">
@@ -240,7 +232,7 @@ const updateRatingStats = () => {
                       <h5 class="card-title">Our Mission</h5>
                       <p class="card-text">
                         We are dedicated to helping men achieve healthier lives through comprehensive 
-                        health information, fitness guidance, and nutritional advice. Our platform 
+                        health information and fitness guidance. Our platform 
                         provides evidence-based resources to support your wellness journey.
                       </p>
                     </div>
@@ -404,13 +396,6 @@ const updateRatingStats = () => {
   gap: 15px; 
 }
 
-.search-btn { 
-  background: none; 
-  border: none; 
-  font-size: 16px; 
-  cursor: pointer; 
-  padding: 5px; 
-}
 
 .separator { 
   width: 1px; 
@@ -683,9 +668,6 @@ const updateRatingStats = () => {
     gap: 10px;
   }
   
-  .search-btn {
-    font-size: 14px;
-  }
   
   .login-link,
   .signup-btn {
